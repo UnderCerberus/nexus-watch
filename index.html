@@ -1,0 +1,1545 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>NEXUS//WATCH — 統合情報監視ダッシュボード FINAL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#04070c;
+  --panel:#080e16;
+  --panel-2:#0b131d;
+  --line:#13293a;
+  --line-hi:#1d4258;
+  --txt:#c7d9e4;
+  --dim:#54728a;
+  --cyan:#27d3f5;
+  --green:#3ddc84;
+  --amber:#ffb454;
+  --red:#ff4d6a;
+  --violet:#a78bfa;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%}
+::selection{background:rgba(39,211,245,.35);color:#fff}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:#070c12}
+::-webkit-scrollbar-thumb{background:var(--line-hi)}
+body{
+  background:
+    radial-gradient(1200px 600px at 70% -10%, rgba(39,211,245,.06), transparent 60%),
+    radial-gradient(900px 500px at 10% 110%, rgba(167,139,250,.05), transparent 60%),
+    var(--bg);
+  color:var(--txt);
+  font-family:"Share Tech Mono","Noto Sans JP",ui-monospace,Consolas,monospace;
+  font-size:13px;
+  display:flex;flex-direction:column;
+  overflow-x:hidden;
+}
+#scan{
+  position:fixed;inset:0;pointer-events:none;z-index:99;
+  background:repeating-linear-gradient(180deg, rgba(255,255,255,.02) 0 1px, transparent 1px 3px);
+  mix-blend-mode:overlay;
+}
+#vig{
+  position:fixed;inset:0;pointer-events:none;z-index:98;
+  background:radial-gradient(120% 90% at 50% 50%, transparent 60%, rgba(0,0,0,.55) 100%);
+}
+#defcon-flash{
+  position:fixed;inset:0;pointer-events:none;z-index:97;opacity:0;
+  background:radial-gradient(circle at 50% 40%, rgba(255,77,106,.38), rgba(255,119,64,.18) 45%, transparent 75%);
+}
+#defcon-flash.go{animation:dflash 1.3s ease-out}
+@keyframes dflash{0%{opacity:1}100%{opacity:0}}
+
+header{
+  display:flex;justify-content:space-between;align-items:center;gap:16px;
+  padding:10px 18px;border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg,#0a121c,#060b12);
+  flex-wrap:wrap;flex-shrink:0;
+  transition:background .6s;
+}
+.brand{display:flex;align-items:baseline;gap:14px}
+.logo{font-size:20px;letter-spacing:2px;color:var(--cyan);text-shadow:0 0 12px rgba(39,211,245,.55);transition:color .6s,text-shadow .6s}
+.logo::before{content:"";display:inline-block;width:10px;height:10px;background:var(--cyan);margin-right:10px;transform:rotate(45deg);box-shadow:0 0 10px var(--cyan);animation:pulse 2s infinite;transition:background .6s}
+.sub{font-size:10px;color:var(--dim);letter-spacing:2px;line-height:1.6}
+.clocks{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.clock{display:flex;flex-direction:column;align-items:flex-end;line-height:1.2}
+.clock label{font-size:9px;color:var(--dim);letter-spacing:2px}
+.clock span{font-size:15px;color:var(--green);text-shadow:0 0 8px rgba(61,220,132,.35)}
+.threat span{
+  color:var(--green);font-size:13px;border:1px solid var(--line-hi);
+  padding:3px 10px;background:rgba(61,220,132,.05);letter-spacing:2px;transition:all .4s;
+}
+.threat span.crit{animation:pulse 1s steps(2) infinite}
+.status{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--green);letter-spacing:2px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 1.6s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+#wclock-bar{
+  display:flex;gap:8px;align-items:center;
+  padding:5px 14px;border-bottom:1px solid var(--line);
+  background:rgba(255,255,255,.012);overflow-x:auto;flex-shrink:0;
+}
+.wc-label{font-size:9px;color:var(--dim);letter-spacing:2px;margin-right:6px;white-space:nowrap}
+.wc{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:11px;color:var(--dim);border:1px solid var(--line);
+  padding:2px 9px;letter-spacing:1px;white-space:nowrap;background:rgba(255,255,255,.01);
+}
+.wc b{color:var(--txt);font-weight:400}
+.wc em{font-style:normal;color:var(--green)}
+.wc i{width:6px;height:6px;border-radius:50%;background:#1c2c3a;font-style:normal;transition:all .4s}
+.wc.open i{background:var(--green);box-shadow:0 0 7px var(--green)}
+.wc.open{border-color:rgba(61,220,132,.35)}
+
+main{
+  flex:1;min-height:0;overflow-y:auto;display:grid;gap:10px;padding:10px;
+  grid-template-columns:minmax(280px,1.05fr) minmax(340px,1.5fr) minmax(240px,.82fr);
+  grid-template-rows:auto auto auto;
+  grid-template-areas:
+    "world trade trend"
+    "world tmmap trend"
+    "quake quake quake";
+  align-content:start;
+}
+.panel{
+  position:relative;
+  border:1px solid var(--line);background:linear-gradient(180deg,var(--panel),var(--panel-2));
+  display:flex;flex-direction:column;
+  box-shadow:inset 0 0 40px rgba(0,0,0,.35);
+  animation:pboot .45s ease both;
+  transition:border-color .5s, box-shadow .5s;
+}
+.panel::before,.panel::after{
+  content:"";position:absolute;width:11px;height:11px;pointer-events:none;
+  border-color:var(--line-hi);border-style:solid;transition:border-color .5s;
+}
+.panel::before{top:-1px;left:-1px;border-width:2px 0 0 2px}
+.panel::after{bottom:-1px;right:-1px;border-width:0 2px 2px 0}
+.panel:hover{border-color:var(--line-hi)}
+.panel:hover::before,.panel:hover::after{border-color:var(--cyan)}
+@keyframes pboot{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.col-world{grid-area:world;min-height:430px;animation-delay:.05s}
+.col-trade{grid-area:trade;animation-delay:.12s}
+.col-tmmap{grid-area:tmmap;animation-delay:.19s}
+.col-trend{grid-area:trend;min-height:430px;animation-delay:.26s}
+.col-quake{grid-area:quake;min-height:620px;animation-delay:.33s}
+.p-head{
+  display:flex;justify-content:space-between;align-items:center;gap:8px;
+  padding:8px 12px;border-bottom:1px solid var(--line);
+  background:linear-gradient(90deg, rgba(39,211,245,.07), transparent 65%);
+  flex-shrink:0;transition:background .6s;
+}
+.p-title{font-size:12px;letter-spacing:3px;color:var(--cyan);transition:color .6s}
+.p-title::before{content:"▸ ";color:inherit}
+.p-meta{font-size:10px;color:var(--dim);letter-spacing:1px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.p-body{padding:8px 10px;overflow-y:auto;flex:1;min-height:0}
+.p-body::-webkit-scrollbar{width:6px}
+.p-body::-webkit-scrollbar-thumb{background:var(--line-hi)}
+
+.src-badge{font-size:9px;border:1px solid var(--line-hi);padding:2px 6px;letter-spacing:1px}
+.src-ok{color:var(--green);border-color:rgba(61,220,132,.5)}
+.src-err{color:var(--red);border-color:rgba(255,77,106,.5)}
+.src-wait{color:var(--dim)}
+
+.tabs{display:flex;gap:4px;margin:6px 0 8px;flex-wrap:wrap}
+.tab{
+  cursor:pointer;font-size:11px;color:var(--dim);border:1px solid var(--line);
+  padding:3px 9px;letter-spacing:1px;user-select:none;background:rgba(255,255,255,.01);
+  transition:all .3s;
+}
+.tab:hover{color:var(--txt);border-color:var(--line-hi)}
+.tab.act{color:var(--cyan);border-color:var(--cyan);background:rgba(39,211,245,.08);transition:all .6s}
+
+.energy-strip{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.energy-card{border:1px solid var(--line);background:rgba(255,255,255,.015);padding:8px 10px}
+.energy-card h4{font-size:10px;color:var(--dim);letter-spacing:2px;margin-bottom:6px}
+.e-row{display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px}
+.bar{height:5px;background:#101c29;position:relative;overflow:hidden}
+.bar i{position:absolute;top:0;left:0;bottom:0;width:30%;transition:width 1s ease}
+.bar i.up{background:linear-gradient(90deg,#133, var(--red));box-shadow:0 0 6px var(--red)}
+.bar i.down{background:linear-gradient(90deg,#133, var(--green));box-shadow:0 0 6px var(--green)}
+
+#news-list{list-style:none}
+#news-list li{
+  display:flex;gap:8px;align-items:flex-start;
+  padding:7px 6px;border-bottom:1px dashed #10222f;
+  animation:slidein .35s ease;
+}
+#news-list li:hover{background:rgba(39,211,245,.04)}
+.n-time{color:var(--dim);font-size:11px;white-space:nowrap;padding-top:1px}
+.tag{font-size:9px;padding:2px 6px;letter-spacing:1px;border:1px solid;white-space:nowrap;margin-top:1px}
+.t-geo{color:var(--red);border-color:rgba(255,77,106,.5);background:rgba(255,77,106,.07)}
+.t-energy{color:var(--amber);border-color:rgba(255,180,84,.5);background:rgba(255,180,84,.07)}
+.t-world{color:var(--cyan);border-color:rgba(39,211,245,.5);background:rgba(39,211,245,.07)}
+.t-econ{color:var(--green);border-color:rgba(61,220,132,.5);background:rgba(61,220,132,.07)}
+.n-txt{line-height:1.5;flex:1;min-width:0}
+.n-txt a{color:inherit;text-decoration:none}
+.n-txt a:hover{color:var(--cyan);text-decoration:underline}
+.n-src{color:var(--dim);font-size:10px}
+@keyframes slidein{from{opacity:0;transform:translateX(-6px)}to{opacity:1;transform:none}}
+
+#market-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(126px,1fr));gap:8px}
+.mcard{
+  border:1px solid var(--line);background:rgba(255,255,255,.015);
+  padding:7px 9px 5px;position:relative;overflow:hidden;
+}
+.mcard:hover{border-color:var(--line-hi)}
+.m-name{font-size:10px;color:var(--dim);letter-spacing:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.m-val{font-size:16px;margin:3px 0 1px;transition:text-shadow .3s;white-space:nowrap}
+.m-val.flash-up{text-shadow:0 0 10px var(--green)}
+.m-val.flash-dn{text-shadow:0 0 10px var(--red)}
+.m-chg{font-size:11px}
+.chg-up{color:var(--green)}.chg-dn{color:var(--red)}.chg-fl{color:var(--dim)}
+.spark{display:block;width:100%;height:24px;margin-top:4px}
+.mcard.shk{animation:shkpulse 1.5s infinite}
+@keyframes shkpulse{
+  0%,100%{box-shadow:0 0 0 rgba(255,77,106,0);border-color:var(--line)}
+  50%{box-shadow:0 0 16px rgba(255,77,106,.55);border-color:var(--red)}
+}
+
+#tm-grid{position:relative;width:100%;height:210px;border:1px solid var(--line);background:rgba(255,255,255,.008)}
+.tm-tile{
+  position:absolute;border:1px solid rgba(255,255,255,.06);overflow:hidden;
+  display:flex;flex-direction:column;justify-content:space-between;
+  padding:5px 6px;cursor:pointer;transition:left .5s ease,top .5s ease,width .5s ease,height .5s ease,background .5s ease;
+}
+.tm-tile:hover{border-color:var(--cyan);z-index:2}
+.tm-tile.shk{animation:shkpulse 1.5s infinite}
+.tm-sym{font-size:10px;color:var(--dim);letter-spacing:1px;white-space:nowrap}
+.tm-pct{font-weight:700;font-size:13px}
+.tm-name{font-size:9px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tm-val{font-size:10px}
+
+#trend-list{list-style:none;counter-reset:tr}
+#trend-list li{
+  display:flex;align-items:center;gap:10px;padding:8px 6px;
+  border-bottom:1px dashed #10222f;animation:slidein .35s ease;
+}
+.tr-rank{counter-increment:tr;color:var(--violet);width:26px;text-align:right;font-size:14px;text-shadow:0 0 8px rgba(167,139,250,.4)}
+.tr-rank::before{content:counter(tr,decimal-leading-zero)}
+.tr-main{flex:1;min-width:0}
+.tr-word{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tr-cat{font-size:9px;color:var(--dim);letter-spacing:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+.tr-vol{font-size:11px;color:var(--amber);text-align:right;white-space:nowrap}
+
+.q-alert{
+  display:none;margin:0 0 10px;padding:10px 14px;
+  border:2px solid var(--red);color:#fff;
+  background:linear-gradient(90deg, rgba(255,77,106,.32), rgba(255,77,106,.1));
+  letter-spacing:1px;font-size:13px;line-height:1.6;
+  box-shadow:0 0 28px rgba(255,77,106,.4), inset 0 0 30px rgba(255,77,106,.08);
+  animation:alertblink 1s steps(2) infinite;
+}
+.q-alert.on{display:block}
+@keyframes alertblink{50%{background:linear-gradient(90deg, rgba(255,77,106,.55), rgba(255,77,106,.18))}}
+.q-alert b{color:var(--red);font-size:14px}
+
+.q-wrap{display:grid;grid-template-columns:minmax(300px,560px) 1fr;gap:12px;align-items:start}
+#globe-box{
+  position:relative;
+  border:1px solid var(--line-hi);
+  background:
+    radial-gradient(circle at 50% 42%, rgba(39,211,245,.05), transparent 68%),#05090f;
+  display:flex;flex-direction:column;align-items:center;padding:8px;
+  box-shadow:inset 0 0 60px rgba(0,0,0,.5);
+}
+#globe-box::before{
+  content:"SEISMIC GLOBE — ORTHO PROJECTION";
+  position:absolute;top:-1px;left:-1px;z-index:2;
+  font-size:9px;letter-spacing:2px;color:var(--dim);
+  background:rgba(4,8,13,.85);padding:2px 8px;border:1px solid var(--line);
+}
+#globe-cv{display:block}
+#globe-info{
+  margin-top:6px;font-size:11px;line-height:1.65;color:var(--dim);
+  text-align:center;min-height:52px;width:100%;
+}
+#globe-info b{color:var(--cyan);font-weight:400}
+.q-logbox{display:flex;flex-direction:column;min-width:0;max-height:620px}
+.q-hint{font-size:9px;color:var(--dim);letter-spacing:1px;margin-bottom:5px;line-height:1.6}
+#quake-log{list-style:none;font-size:12px}
+#quake-log li{padding:5px 6px;border-bottom:1px dashed #10222f;border-left:2px solid transparent;animation:slidein .3s ease;line-height:1.5;cursor:pointer}
+#quake-log li:hover{background:rgba(39,211,245,.06)}
+#quake-log li.sel{border-left-color:var(--cyan);background:rgba(39,211,245,.06)}
+.q-time{color:var(--dim)}
+.q-mag{font-weight:700;margin:0 4px}
+.mag-lo{color:var(--green)}.mag-md{color:var(--amber)}.mag-hi{color:var(--red);text-shadow:0 0 8px rgba(255,77,106,.5)}
+.q-place{color:var(--txt)}
+.q-dom{font-size:9px;border:1px solid rgba(39,211,245,.4);color:var(--cyan);padding:1px 4px;margin-right:5px}
+.q-intl{font-size:9px;border:1px solid rgba(167,139,250,.4);color:var(--violet);padding:1px 4px;margin-right:5px}
+.snd-btn{
+  cursor:pointer;font-family:inherit;font-size:10px;color:var(--dim);
+  background:none;border:1px solid var(--line);padding:2px 8px;letter-spacing:1px;
+}
+.snd-btn.on{color:var(--red);border-color:var(--red)}
+
+#syscon{
+  flex-shrink:0;height:122px;display:flex;flex-direction:column;
+  border-top:1px solid var(--line);background:#04080d;
+  transition:height .25s ease;
+}
+#syscon.closed{height:27px}
+#syscon.closed #syscon-body{display:none}
+#syscon-head{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:5px 12px;border-bottom:1px dashed var(--line);
+  font-size:10px;letter-spacing:2px;color:var(--dim);
+  background:rgba(39,211,245,.03);
+  cursor:pointer;user-select:none;flex-shrink:0;
+}
+#syscon-head:hover{color:var(--txt)}
+#syscon-chev{
+  font-style:normal;color:var(--cyan);display:inline-block;
+  margin-right:7px;transition:transform .25s;
+}
+#syscon.closed #syscon-chev{transform:rotate(-90deg)}
+.blink{color:var(--cyan);animation:pulse 1s steps(2) infinite}
+#syscon-body{flex:1;overflow-y:auto;padding:4px 12px}
+.sc-line{font-size:11px;line-height:1.55;color:#87a0b2;white-space:nowrap}
+.sc-t{color:#3d5a74;margin-right:9px}
+.sc-tag{display:inline-block;width:58px;margin-right:9px;letter-spacing:1px}
+
+footer{border-top:1px solid var(--line);background:#060b12;overflow:hidden;padding:6px 0;flex-shrink:0}
+#ticker-track{display:inline-block;white-space:nowrap;animation:marquee 65s linear infinite;color:var(--dim);font-size:12px;will-change:transform}
+#ticker-track em{color:var(--cyan);font-style:normal}
+#ticker-track i{color:var(--amber);font-style:normal}
+@keyframes marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+
+body.dcw header{background:linear-gradient(180deg,#171009,#0b0805)}
+body.dcw .logo{color:var(--amber);text-shadow:0 0 12px rgba(255,180,84,.55)}
+body.dcw .logo::before{background:var(--amber);box-shadow:0 0 10px var(--amber)}
+body.dcw .p-title{color:var(--amber)}
+body.dcw .p-head{background:linear-gradient(90deg, rgba(255,180,84,.08), transparent 65%)}
+body.dcw .tab.act{color:var(--amber);border-color:var(--amber);background:rgba(255,180,84,.08)}
+body.dcw .panel{border-color:#332617}
+body.dcw .panel::before,body.dcw .panel::after{border-color:#5a4322}
+body.dcc header{background:linear-gradient(180deg,#1a0b10,#0b0507)}
+body.dcc .logo{color:var(--red);text-shadow:0 0 14px rgba(255,77,106,.6)}
+body.dcc .logo::before{background:var(--red);box-shadow:0 0 12px var(--red)}
+body.dcc .p-title{color:var(--red)}
+body.dcc .p-head{background:linear-gradient(90deg, rgba(255,77,106,.1), transparent 65%)}
+body.dcc .tab.act{color:var(--red);border-color:var(--red);background:rgba(255,77,106,.1)}
+body.dcc .panel{border-color:#421820;box-shadow:inset 0 0 46px rgba(255,77,106,.05)}
+body.dcc .panel::before,body.dcc .panel::after{border-color:var(--red)}
+
+@media(max-width:1150px){
+  main{
+    grid-template-columns:1fr 1fr;
+    grid-template-areas:
+      "world world"
+      "trade tmmap"
+      "trend trend"
+      "quake quake";
+  }
+}
+@media(max-width:720px){
+  main{
+    grid-template-columns:1fr;
+    grid-template-areas:"world" "trade" "tmmap" "trend" "quake";
+  }
+  .q-wrap{grid-template-columns:1fr}
+  .q-logbox{max-height:420px}
+}
+</style>
+</head>
+<body>
+<div id="scan"></div><div id="vig"></div>
+<div id="defcon-flash"></div>
+
+<header>
+  <div class="brand">
+    <span class="logo">NEXUS//WATCH</span>
+    <span class="sub">REAL-TIME INTELLIGENCE DASHBOARD · FINAL BUILD<br>P2P QUAKE · USGS · YAHOO FINANCE · FRANKFURTER · BINANCE · WORLD RSS · TRENDS</span>
+  </div>
+  <div class="clocks">
+    <div class="threat"><label>DEFCON</label> <span id="threat-level">LEVEL 1</span></div>
+    <div class="clock"><label>JST</label><span id="clock-jst">--:--:--</span></div>
+    <div class="clock"><label>UTC</label><span id="clock-utc">--:--:--</span></div>
+    <div class="status"><span class="dot"></span><span id="link-state">CONNECTING</span></div>
+  </div>
+</header>
+
+<div id="wclock-bar"><span class="wc-label">WORLD CLOCK //</span></div>
+
+<main>
+  <section class="panel col-world" id="panel-world">
+    <div class="p-head">
+      <span class="p-title">WORLD MONITOR / 世界情勢</span>
+      <span class="p-meta">
+        <span class="src-badge src-wait" id="feed-src">RSS WAIT</span>
+        <span id="news-count">0 ITEMS</span>
+      </span>
+    </div>
+    <div class="p-body">
+      <div class="tabs" id="news-tabs">
+        <span class="tab act" data-f="all">全て</span>
+        <span class="tab" data-f="地政学">地政学リスク</span>
+        <span class="tab" data-f="エネルギー">エネルギー</span>
+        <span class="tab" data-f="経済">経済・金融</span>
+        <span class="tab" data-f="世界">世界ニュース</span>
+      </div>
+      <div class="energy-strip">
+        <div class="energy-card">
+          <h4>WTI原油 / CRUDE</h4>
+          <div class="e-row"><span id="e-wti-val">--</span><span id="e-wti-chg" class="chg-fl">--%</span></div>
+          <div class="bar"><i id="e-wti-bar"></i></div>
+        </div>
+        <div class="energy-card">
+          <h4>天然ガス / NATGAS</h4>
+          <div class="e-row"><span id="e-gas-val">--</span><span id="e-gas-chg" class="chg-fl">--%</span></div>
+          <div class="bar"><i id="e-gas-bar"></i></div>
+        </div>
+      </div>
+      <ul id="news-list"></ul>
+    </div>
+  </section>
+
+  <section class="panel col-trade" id="panel-trade">
+    <div class="p-head">
+      <span class="p-title">MARKETS / 株・為替・商品</span>
+      <span class="p-meta" id="mkt-ts">SYNC --:--:--</span>
+    </div>
+    <div class="p-body">
+      <div id="market-grid"></div>
+    </div>
+  </section>
+
+  <section class="panel col-tmmap" id="panel-tmmap">
+    <div class="p-head">
+      <span class="p-title">TRADE MAP / ヒートマップ</span>
+      <span class="p-meta"><span id="tm-ts">面積=変動率 | ±3%超で警報点滅</span></span>
+    </div>
+    <div class="p-body">
+      <div id="tm-grid"></div>
+    </div>
+  </section>
+
+  <section class="panel col-trend" id="panel-trend">
+    <div class="p-head">
+      <span class="p-title">TRENDING JP / 日本のトレンド</span>
+      <span class="p-meta">
+        <span class="src-badge src-wait" id="trend-src">SOURCE WAIT</span>
+        <span id="trend-ts">UPDATE --:--</span>
+      </span>
+    </div>
+    <div class="p-body">
+      <ol id="trend-list"></ol>
+    </div>
+  </section>
+
+  <section class="panel col-quake" id="panel-quake">
+    <div class="p-head">
+      <span class="p-title">SEISMIC CENTER / 地震監視センター</span>
+      <span class="p-meta">
+        <button class="snd-btn" id="snd-btn">SFX OFF</button>
+        <span class="src-badge src-wait" id="q-src">P2P·USGS</span>
+        <span id="q-stats">--件</span>
+      </span>
+    </div>
+    <div class="p-body">
+      <div class="q-alert" id="q-alert"></div>
+      <div class="q-wrap">
+        <div id="globe-box">
+          <canvas id="globe-cv"></canvas>
+          <div id="globe-info">TRACKING GLOBAL SEISMIC ACTIVITY...</div>
+        </div>
+        <div class="q-logbox">
+          <div class="q-hint">▸ リストをクリックで発生地点へカメラが自動回転・ズームインし、P波/S波の伝播を表示します。震度5弱以上またはM6超の地震では緊急アラート＋DEFCON連動が作動します。</div>
+          <ul id="quake-log"></ul>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<section id="syscon">
+  <div id="syscon-head"><span><i id="syscon-chev">▾</i>SYSTEM LOG / CONSOLE（クリックで開閉）</span><span class="blink">_</span></div>
+  <div id="syscon-body"></div>
+</section>
+
+<footer><div id="ticker-track">CONNECTING TO LIVE FEEDS...</div></footer>
+
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+
+const CONFIG = {
+  p2pQuakeUrl: "https://api.p2pquake.net/v2/history?codes=551&limit=60",
+  usgsQuakeUrl: "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_day.geojson",
+  landUrl: "https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json",
+  googleTrendsUrl: "https://trends.google.com/trending/rss?geo=JP",
+  trends24Url: "https://trends24.in/japan/",
+  mastodonTrendsUrl: "https://mastodon.social/api/v1/trends/tags?limit=12",
+  yahooHosts: ["query1.finance.yahoo.com","query2.finance.yahoo.com"],
+  marketRefreshMs: 60000,
+  quakeRefreshMs: 120000,
+  newsRefreshMs: 300000,
+  trendRefreshMs: 600000,
+  fetchTimeoutMs: 18000,
+  proxyCooldownMs: 600000,
+  shockThresholdPct: -3,
+  maxNews: 40,
+  maxQuakeLog: 45,
+  maxSysLog: 90
+};
+
+const pad=n=>String(n).padStart(2,"0");
+const fmtTime=d=>`${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+const fmtHM=d=>`${pad(d.getHours())}:${pad(d.getMinutes())}`;
+const fmtNum=(n,d)=>n.toLocaleString("ja-JP",{minimumFractionDigits:d,maximumFractionDigits:d});
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const clampN=(v,a,b)=>Math.min(b,Math.max(a,v));
+const easeIO=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
+
+const LOG_COLORS={SYS:"#54728a",P2P:"#27d3f5",USGS:"#a78bfa",MKT:"#3ddc84",RSS:"#27d3f5",TREND:"#ffb454",ALERT:"#ff4d6a",AUDIO:"#3ddc84",PROXY:"#ffb454"};
+const slogGate={};
+function slog(tag,msg){
+  const key=tag+"|"+msg,now=Date.now();
+  if(slogGate[key]&&now-slogGate[key]<60000)return;
+  slogGate[key]=now;
+  const box=$("#syscon-body");
+  if(!box)return;
+  const line=document.createElement("div");
+  line.className="sc-line";
+  line.innerHTML=`<span class="sc-t">[${fmtTime(new Date())}]</span><span class="sc-tag" style="color:${LOG_COLORS[tag]||"#54728a"}">${tag}</span>${esc(msg)}`;
+  box.appendChild(line);
+  while(box.children.length>CONFIG.maxSysLog)box.removeChild(box.firstChild);
+  box.scrollTop=box.scrollHeight;
+}
+
+const PROXIES = [
+  {name:"DIRECT",     wrap:u=>u},
+  {name:"ALLORIGINS", wrap:u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`},
+  {name:"CODETABS",   wrap:u=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`},
+  {name:"CORSPROXY",  wrap:u=>`https://corsproxy.io/?url=${encodeURIComponent(u)}`}
+];
+const prefProxy = {};
+const proxyFailAt = {};
+
+async function fetchWithTimeout(url,ms){
+  const c=new AbortController();
+  const t=setTimeout(()=>c.abort(),ms);
+  try{ return await fetch(url,{signal:c.signal,cache:"no-store"}); }
+  finally{ clearTimeout(t); }
+}
+async function smartFetch(srcUrl,quiet){
+  const host=new URL(srcUrl).host;
+  const all=PROXIES.map((_,i)=>i);
+  let order=all.filter(i=>i!==(prefProxy[host]??-1));
+  if(prefProxy[host]!==undefined)order=[prefProxy[host],...order];
+  const nowMs=Date.now();
+  order.sort((a,b)=>{
+    const fa=proxyFailAt[host+"::"+a]||0,fb=proxyFailAt[host+"::"+b]||0;
+    const ca=(nowMs-fa<CONFIG.proxyCooldownMs)?1:0,cb=(nowMs-fb<CONFIG.proxyCooldownMs)?1:0;
+    return ca-cb;
+  });
+  let lastErr=null,failCount=0;
+  for(const i of order){
+    try{
+      const r=await fetchWithTimeout(PROXIES[i].wrap(srcUrl),CONFIG.fetchTimeoutMs);
+      if(!r.ok)throw new Error("HTTP "+r.status);
+      const txt=await r.text();
+      if(!txt)throw new Error("empty response");
+      prefProxy[host]=i;
+      if(failCount>0)slog("PROXY",`route OK via ${PROXIES[i].name} → ${host}`);
+      return txt;
+    }catch(e){
+      failCount++;
+      proxyFailAt[host+"::"+i]=Date.now();
+      lastErr=e;
+    }
+  }
+  if(!quiet)slog("PROXY",`all routes failed for ${host} (${lastErr&&lastErr.name==="AbortError"?"timeout":lastErr&&lastErr.message||"error"})`);
+  throw lastErr||new Error("all routes failed");
+}
+const getJSON = async u=>JSON.parse(await smartFetch(u));
+
+function setBadge(sel,state,label){
+  const el=$(sel);
+  if(!el)return;
+  el.className="src-badge "+(state==="ok"?"src-ok":state==="err"?"src-err":"src-wait");
+  el.textContent=label;
+}
+
+const flags={markets:null,news:null,trends:null,p2p:null,usgs:null};
+function updateOverallStatus(){
+  const el=$("#link-state"),dot=$(".dot");
+  if(!el)return;
+  const groups=[flags.markets,flags.news,flags.trends,(flags.p2p||flags.usgs)];
+  const ok=groups.filter(Boolean).length;
+  if(ok===groups.length){el.textContent="LIVE FEED";el.style.color="var(--green)";if(dot)dot.style.background="var(--green)";}
+  else if(ok===0){el.textContent="OFFLINE";el.style.color="var(--red)";if(dot)dot.style.background="var(--red)";}
+  else{el.textContent="PARTIAL";el.style.color="var(--amber)";if(dot)dot.style.background="var(--amber)";}
+}
+
+const CITIES=[
+  ["TYO","Asia/Tokyo",9,15],
+  ["NYC","America/New_York",9.5,16],
+  ["LDN","Europe/London",8,16.5],
+  ["SGP","Asia/Singapore",9,17]
+];
+function buildWClock(){
+  const bar=$("#wclock-bar");
+  if(!bar)return;
+  bar.insertAdjacentHTML("beforeend",CITIES.map(c=>
+    `<span class="wc" data-tz="${c[1]}"><i></i><b>${c[0]}</b><em>--:--</em></span>`).join(""));
+}
+function updateWClock(){
+  const now=new Date();
+  document.querySelectorAll("#wclock-bar .wc").forEach(el=>{
+    const tz=el.dataset.tz;
+    try{
+      const parts=new Intl.DateTimeFormat("en-GB",{timeZone:tz,hour:"2-digit",minute:"2-digit",hour12:false,weekday:"short"}).formatToParts(now);
+      const get=t=>{const p=parts.find(x=>x.type===t);return p?p.value:"";};
+      const hh=parseInt(get("hour"),10)||0,mm=parseInt(get("minute"),10)||0,wd=get("weekday");
+      el.querySelector("em").textContent=`${pad(hh)}:${pad(mm)}`;
+      const h=hh+mm/60;
+      const cfg=CITIES.find(c=>c[1]===tz);
+      const open=wd!=="Sat"&&wd!=="Sun"&&cfg&&h>=cfg[2]&&h<cfg[3];
+      el.classList.toggle("open",open);
+    }catch(e){}
+  });
+}
+
+let audioCtx=null,soundOn=false;
+const sndBtn=$("#snd-btn");
+if(sndBtn){
+  sndBtn.addEventListener("click",()=>{
+    soundOn=!soundOn;
+    sndBtn.classList.toggle("on",soundOn);
+    sndBtn.textContent=soundOn?"SFX ON":"SFX OFF";
+    if(soundOn&&!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    slog("AUDIO","sfx "+(soundOn?"enabled":"muted"));
+  });
+}
+function tone(f0,f1,dur,type,vol,when){
+  if(!soundOn||!audioCtx)return;
+  const t=audioCtx.currentTime+(when||0);
+  const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+  o.type=type;
+  o.frequency.setValueAtTime(f0,t);
+  if(f1)o.frequency.exponentialRampToValueAtTime(f1,t+dur);
+  g.gain.setValueAtTime(.0001,t);
+  g.gain.exponentialRampToValueAtTime(vol,t+.02);
+  g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+  o.connect(g);g.connect(audioCtx.destination);
+  o.start(t);o.stop(t+dur+.05);
+}
+function sfxPing(){tone(880,1480,.22,"sine",.06);}
+function sfxAlarm(){
+  tone(880,null,.12,"square",.09,0);
+  tone(660,null,.12,"square",.09,.18);
+  tone(880,null,.12,"square",.09,.36);
+  tone(1240,1980,.34,"triangle",.07,.54);
+}
+function sfxSiren(){
+  tone(420,960,.5,"sawtooth",.08,0);
+  tone(960,420,.5,"sawtooth",.08,.52);
+}
+
+const MARKETS=[
+  {id:"nikkei", name:"日経平均",     sym:"^N225",    dig:0, stooq:"^nkx"},
+  {id:"usdjpy", name:"ドル円",       sym:"JPY=X",    dig:3, stooq:"usdjpy"},
+  {id:"eurjpy", name:"ユーロ円",     sym:"EURJPY=X", dig:3, stooq:"eurjpy"},
+  {id:"wti",    name:"WTI原油",      sym:"CL=F",     dig:2, stooq:"cl.f"},
+  {id:"brent",  name:"ブレント原油", sym:"BZ=F",     dig:2, stooq:"bz.f"},
+  {id:"natgas", name:"天然ガス",     sym:"NG=F",     dig:3, stooq:"ng.f"},
+  {id:"gold",   name:"金(COMEX)",    sym:"GC=F",     dig:1, stooq:"gc.f"},
+  {id:"btc",    name:"BTC/USD",      sym:"BTC-USD",  dig:0, stooq:"btcusd"}
+];
+
+function buildMarketCards(){
+  const grid=$("#market-grid");
+  if(!grid)return;
+  grid.innerHTML=MARKETS.map(m=>`
+    <div class="mcard" id="mc-${m.id}">
+      <div class="m-name">${esc(m.name)} <span style="opacity:.5">${esc(m.sym)}</span></div>
+      <div class="m-val chg-fl">--</div>
+      <div class="m-chg chg-fl">接続中...</div>
+      <canvas class="spark"></canvas>
+    </div>`).join("");
+  MARKETS.forEach(m=>{
+    const c=$(`#mc-${m.id} canvas`);
+    if(!c)return;
+    const dpr=window.devicePixelRatio||1;
+    c.width=Math.max(c.clientWidth*dpr,1);c.height=Math.max(c.clientHeight*dpr,1);
+    m.ctx=c.getContext("2d");m.cv=c;m.dpr=dpr;
+    m.last=null;m.hist=[];m.prev=null;m.note="";
+  });
+}
+function drawSpark(m){
+  if(!m.ctx||!m.cv||!m.hist||m.hist.length<2)return;
+  const {ctx,cv,hist,dpr}=m,w=cv.width/dpr,h=cv.height/dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);
+  const mn=Math.min(...hist),mx=Math.max(...hist),rg=(mx-mn)||1;
+  const ref=m.prev??mn;
+  const up=hist[hist.length-1]>=ref;
+  ctx.beginPath();
+  hist.forEach((v,i)=>{
+    const x=i/(hist.length-1)*w,y=h-2-((v-mn)/rg)*(h-4);
+    i?ctx.lineTo(x,y):ctx.moveTo(x,y);
+  });
+  ctx.strokeStyle=up?"#3ddc84":"#ff4d6a";
+  ctx.lineWidth=1.2;ctx.shadowColor=ctx.strokeStyle;ctx.shadowBlur=4;ctx.stroke();
+}
+function applyQuote(m,price,prev,closes,note){
+  const card=$(`#mc-${m.id}`);
+  if(!card)return;
+  const valEl=card.querySelector(".m-val"),chgEl=card.querySelector(".m-chg");
+  if(!valEl||!chgEl)return;
+  if(price==null){valEl.textContent="--";chgEl.textContent="データ無し";return;}
+  m.hist=(closes&&closes.length>1)?closes.slice(-40):[];
+  if(m.hist.length<2)m.hist=[prev??price,price];
+  m.prev=prev;
+  m.note=note||"";
+  const ref=prev??price;
+  const diff=price-ref,pct=ref?(diff/ref*100):0;
+  const cls=pct>0?"chg-up":pct<0?"chg-dn":"chg-fl";
+  valEl.textContent=fmtNum(price,m.dig);
+  valEl.className="m-val "+cls;
+  chgEl.className="m-chg "+cls;
+  chgEl.textContent=`${diff>=0?"+":""}${fmtNum(diff,m.dig)} (${diff>=0?"+":""}${pct.toFixed(2)}%)${m.note?" · "+m.note:""}`;
+  card.classList.toggle("shk",Math.abs(pct)>=Math.abs(CONFIG.shockThresholdPct));
+  if(m.last!=null&&price!==m.last){
+    valEl.classList.remove("flash-up","flash-dn");
+    void valEl.offsetWidth;
+    valEl.classList.add(price>m.last?"flash-up":"flash-dn");
+  }
+  m.last=price;
+  drawSpark(m);
+  if(m.id==="wti")updEnergy("wti",price,prev);
+  if(m.id==="natgas")updEnergy("natgas",price,prev);
+}
+function updEnergy(id,price,prev){
+  const v=$(`#e-${id}-val`),ch=$(`#e-${id}-chg`),bar=$(`#e-${id}-bar`);
+  if(!v||!ch||!bar||price==null||!prev)return;
+  const pct=(price/prev-1)*100;
+  v.textContent=fmtNum(price,id==="natgas"?3:2);
+  ch.className=pct>=0?"chg-up":"chg-dn";
+  ch.textContent=`${pct>=0?"+":""}${pct.toFixed(2)}%`;
+  bar.className=pct>=0?"up":"down";
+  bar.style.width=Math.min(96,30+Math.abs(pct)*22)+"%";
+}
+
+async function fetchYahooChart(sym){
+  let lastErr=null;
+  for(const host of CONFIG.yahooHosts){
+    try{
+      return JSON.parse(await smartFetch(`https://${host}/v8/finance/chart/${encodeURIComponent(sym)}?range=1d&interval=5m`,true));
+    }catch(e){ lastErr=e; }
+  }
+  throw lastErr;
+}
+async function fbFrankfurter(base,quote){
+  const j=await getJSON(`https://api.frankfurter.dev/v1/latest?base=${base}&symbols=${quote}`);
+  const p=j&&j.rates&&j.rates[quote];
+  if(typeof p!=="number")throw new Error("no rate");
+  return{price:p,prev:p,closes:[],note:"ECB日次"};
+}
+async function fbErApi(base,quote){
+  const j=await getJSON(`https://open.er-api.com/v6/latest/${base}`);
+  const p=j&&j.rates&&j.rates[quote];
+  if(typeof p!=="number")throw new Error("no rate");
+  return{price:p,prev:p,closes:[],note:"ER-API"};
+}
+async function fbCurrencyApi(base,quote){
+  const b=base.toLowerCase(),q=quote.toLowerCase();
+  const urls=[
+    `https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/${b}.json`,
+    `https://latest.currency-api.pages.dev/v1/currencies/${b}.json`
+  ];
+  let lastErr=null;
+  for(const u of urls){
+    try{
+      const j=await getJSON(u);
+      const p=j&&j[b]&&j[b][q];
+      if(typeof p==="number")return{price:p,prev:p,closes:[],note:"CURRENCY-API"};
+    }catch(e){ lastErr=e; }
+  }
+  throw lastErr||new Error("currency-api failed");
+}
+async function fbBinance(){
+  const k=await getJSON("https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=5m&limit=40");
+  if(!Array.isArray(k)||!k.length)throw new Error("no klines");
+  const closes=k.map(r=>parseFloat(r[4])).filter(v=>isFinite(v));
+  return{price:closes[closes.length-1],prev:closes[0],closes,note:"BINANCE"};
+}
+async function fbCoinbase(){
+  const j=await getJSON("https://api.coinbase.com/v2/prices/BTC-USD/spot");
+  const p=j&&j.data?parseFloat(j.data.amount):NaN;
+  if(!isFinite(p))throw new Error("no price");
+  return{price:p,prev:p,closes:[],note:"COINBASE"};
+}
+async function fbCoinGecko(){
+  const j=await getJSON("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd");
+  const p=j&&j.bitcoin&&j.bitcoin.usd;
+  if(typeof p!=="number")throw new Error("no price");
+  return{price:p,prev:p,closes:[],note:"COINGECKO"};
+}
+async function fetchStooq(ssym){
+  const csv=await smartFetch(`https://stooq.com/q/l/?s=${encodeURIComponent(ssym)}&f=sd2t2ohlcv&h&e=csv`,true);
+  const rows=csv.trim().split(/\r?\n/);
+  if(rows.length<2)throw new Error("bad csv");
+  const cols=rows[1].split(",");
+  const open=parseFloat(cols[3]),close=parseFloat(cols[6]);
+  if(!isFinite(open)||!isFinite(close))throw new Error("csv values missing");
+  return{price:close,open};
+}
+async function loadSymbol(m){
+  try{
+    const j=await fetchYahooChart(m.sym);
+    const res=j&&j.chart&&j.chart.result&&j.chart.result[0];
+    if(res){
+      const meta=res.meta||{};
+      const price=meta.regularMarketPrice??null;
+      const prev=meta.chartPreviousClose??meta.previousClose??null;
+      const raw=(res.indicators&&res.indicators.quote&&res.indicators.quote[0]&&res.indicators.quote[0].close)||[];
+      const closes=raw.filter(v=>typeof v==="number"&&isFinite(v));
+      if(price!=null){
+        applyQuote(m,price,prev,closes,"");
+        return "";
+      }
+    }
+    throw new Error("empty payload");
+  }catch(e){}
+  try{
+    const q=await fetchStooq(m.stooq);
+    applyQuote(m,q.price,q.open,[q.open,q.price],"STOOQ");
+    return `${m.sym}→STOOQ`;
+  }catch(e){}
+  try{
+    let fb=null;
+    if(m.id==="usdjpy"){
+      try{fb=await fbFrankfurter("USD","JPY");}
+      catch(e){try{fb=await fbErApi("USD","JPY");}catch(e2){fb=await fbCurrencyApi("USD","JPY");}}
+    }else if(m.id==="eurjpy"){
+      try{fb=await fbFrankfurter("EUR","JPY");}
+      catch(e){try{fb=await fbErApi("EUR","JPY");}catch(e2){fb=await fbCurrencyApi("EUR","JPY");}}
+    }else if(m.id==="btc"){
+      try{fb=await fbBinance();}
+      catch(e){try{fb=await fbCoinbase();}catch(e2){fb=await fbCoinGecko();}}
+    }
+    if(!fb)throw new Error("no fallback for this symbol");
+    applyQuote(m,fb.price,fb.prev,fb.closes,fb.note);
+    return `${m.sym}→${fb.note}`;
+  }catch(e){}
+  slog("MKT",`${m.sym}: all sources exhausted`);
+  return null;
+}
+async function refreshMarkets(){
+  const results=await Promise.allSettled(MARKETS.map(loadSymbol));
+  const fbTags=[];
+  let okCnt=0;
+  results.forEach(r=>{
+    if(r.status==="fulfilled"){
+      okCnt++;
+      if(r.value)fbTags.push(r.value);
+    }
+  });
+  flags.markets=okCnt>0;
+  const ts=$("#mkt-ts");
+  if(ts)ts.textContent=`SYNC ${fmtTime(new Date())} (${okCnt}/${MARKETS.length})`;
+  slog("MKT",`yahoo sync ${okCnt}/${MARKETS.length}`+(fbTags.length?` · fallback: ${fbTags.join(", ")}`:""));
+  const hadShock=defconTriggers.some(t=>t.src==="MKT");
+  let worstPct=null;
+  MARKETS.forEach(m=>{
+    if(m.last!=null&&m.prev){
+      const p=(m.last-m.prev)/m.prev*100;
+      if(p<=CONFIG.shockThresholdPct&&(worstPct===null||p<worstPct))worstPct=p;
+    }
+  });
+  if(worstPct!==null){
+    const lvl=worstPct<=-5?3:2;
+    pushDefconTrigger(lvl,45,"MKT");
+    if(!hadShock)slog("ALERT",`market shock ${worstPct.toFixed(2)}% — DEFCON pressure L${lvl}`);
+  }else{
+    for(let i=defconTriggers.length-1;i>=0;i--){
+      if(defconTriggers[i].src==="MKT")defconTriggers.splice(i,1);
+    }
+  }
+  renderTradeMap();
+  updateOverallStatus();
+  updateThreat();
+}
+
+function splitTiles(list,x,y,w,h,out){
+  if(list.length===1){out.push({it:list[0],x,y,w,h});return;}
+  const total=list.reduce((s,i)=>s+i.w,0);
+  let acc=0,cut=list.length-1;
+  for(let i=0;i<list.length;i++){
+    acc+=list[i].w;
+    if(acc>=total/2){cut=i+1;break;}
+  }
+  cut=clampN(cut,1,list.length-1);
+  const aList=list.slice(0,cut),bList=list.slice(cut);
+  const aw=aList.reduce((s,i)=>s+i.w,0),frac=total?aw/total:.5;
+  if(w>=h){
+    splitTiles(aList,x,y,w*frac,h,out);
+    splitTiles(bList,x+w*frac,y,w*(1-frac),h,out);
+  }else{
+    splitTiles(aList,x,y,w,h*frac,out);
+    splitTiles(bList,x,y+h*frac,w,h*(1-frac),out);
+  }
+}
+function renderTradeMap(){
+  const grid=$("#tm-grid");
+  if(!grid)return;
+  const data=MARKETS.filter(m=>m.last!=null).map(m=>{
+    const ref=m.prev??m.last;
+    const pct=ref?((m.last-ref)/ref*100):0;
+    return{m,pct,w:Math.max(Math.abs(pct),.12)+.5};
+  }).sort((a,b)=>b.w-a.w);
+  if(!data.length){
+    grid.innerHTML='<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:11px">WAITING FOR QUOTES...</div>';
+    return;
+  }
+  const rect=grid.getBoundingClientRect();
+  const W=Math.max(rect.width,120),H=Math.max(rect.height,80);
+  const out=[];
+  splitTiles(data,0,0,W,H,out);
+  grid.innerHTML=out.map(o=>{
+    const up=o.it.pct>=0;
+    const alpha=clampN(.10+Math.abs(o.it.pct)*.16,.10,.72);
+    const bg=up?`rgba(61,220,132,${alpha})`:`rgba(255,77,106,${alpha})`;
+    const cls=up?"chg-up":o.it.pct<0?"chg-dn":"chg-fl";
+    const shk=Math.abs(o.it.pct)>=Math.abs(CONFIG.shockThresholdPct)?" shk":"";
+    return `<div class="tm-tile${shk}" style="left:${o.x}px;top:${o.y}px;width:${o.w}px;height:${o.h}px;background:${bg}" title="${esc(o.it.m.name)} ${fmtNum(o.it.m.last,o.it.m.dig)} (${o.it.pct>=0?"+":""}${o.it.pct.toFixed(2)}%)">
+      <span class="tm-sym">${esc(o.it.m.sym)}</span>
+      <span class="tm-pct ${cls}">${o.it.pct>=0?"+":""}${o.it.pct.toFixed(2)}%</span>
+      <span class="tm-name">${esc(o.it.m.name)}</span>
+      <span class="tm-val">${fmtNum(o.it.m.last,o.it.m.dig)}</span>
+    </div>`;
+  }).join("");
+  const ts=$("#tm-ts");
+  if(ts)ts.textContent="AREA=|%CHG| "+fmtHM(new Date());
+}
+
+const FEEDS=[
+  {name:"NHK",       url:"https://www3.nhk.or.jp/rss/news/cat0.xml"},
+  {name:"BBC WORLD", url:"https://feeds.bbci.co.uk/news/world/rss.xml"},
+  {name:"ALJAZEERA", url:"https://www.aljazeera.com/xml/rss/all.xml"},
+  {name:"CNBC",      url:"https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100727362"}
+];
+const KW_GEO=["戦争","攻撃","空爆","ミサイル","紛争","停戦","制裁","軍事","侵攻","ウクライナ","ロシア","ガザ","イスラエル","ハマス","ヒズボラ","イラン","北朝鮮","台湾","南シナ海","クーデター","政変","テロ","人質","核兵器","ドローン","war ","strikes","missile","conflict","ceasefire","sanction","military","ukraine","russia","gaza","israel","hamas","hezbollah","iran","north korea","taiwan","coup","terror","hostage","nuclear","drone"];
+const KW_ENERGY=["原油","石油","OPEC","天然ガス","LNG","ガス田","油田","製油所","電力","原子力","原発","再エネ","エネルギー","送電","oil","opec","natural gas","lng","crude","refinery","pipeline","power grid","energy","petroleum"];
+const KW_ECON=["日銀","日本銀行","為替","株価","市場","金利","インフレ","デフレ","CPI","GDP","雇用","失業率","利上げ","利下げ","決算","貿易","関税","円安","円高","yen","boj","bank of japan","fed","ecb","inflation","interest rate","stocks","markets","earnings","gdp","jobs","recession","tariff","trade","currency","bond"];
+function classifyNews(title){
+  const t=title.toLowerCase();
+  if(KW_GEO.some(k=>title.includes(k)||t.includes(k)))return"地政学";
+  if(KW_ENERGY.some(k=>title.includes(k)||t.includes(k)))return"エネルギー";
+  if(KW_ECON.some(k=>title.includes(k)||t.includes(k)))return"経済";
+  return"世界";
+}
+function parseRssItems(xmlText){
+  const doc=new DOMParser().parseFromString(xmlText,"text/xml");
+  if(doc.querySelector("parsererror"))throw new Error("xml parse error");
+  return Array.from(doc.getElementsByTagName("item")).map(it=>{
+    const g=t=>{const n=it.getElementsByTagName(t)[0];return n?n.textContent.trim():"";};
+    return{title:g("title"),link:g("link"),date:g("pubDate")};
+  }).filter(x=>x.title);
+}
+
+let newsFilter="all";
+let newsItems=[];
+function pushRealNews(items,feedName){
+  const seen=new Set(newsItems.map(n=>n.key));
+  items.forEach(it=>{
+    const key=it.title.replace(/\s+/g,"").toLowerCase().slice(0,80);
+    if(seen.has(key))return;
+    seen.add(key);
+    let t=new Date(it.date);
+    if(isNaN(t.getTime()))t=new Date();
+    newsItems.push({key,cat:classifyNews(it.title),text:it.title,src:feedName,t,link:it.link});
+  });
+  newsItems.sort((a,b)=>b.t-a.t);
+  newsItems=newsItems.slice(0,CONFIG.maxNews);
+}
+function renderNews(){
+  const ul=$("#news-list");
+  if(!ul)return;
+  const tc={"地政学":"t-geo","エネルギー":"t-energy","経済":"t-econ","世界":"t-world"};
+  ul.innerHTML=newsItems.filter(n=>newsFilter==="all"||n.cat===newsFilter)
+    .map(n=>`<li><span class="n-time">${fmtHM(n.t)}</span>
+      <span class="tag ${tc[n.cat]}">${n.cat}</span>
+      <span class="n-txt"><a href="${esc(n.link)}" target="_blank" rel="noopener noreferrer">${esc(n.text)}</a><br><span class="n-src">via ${esc(n.src)}</span></span></li>`)
+    .join("");
+  const cnt=$("#news-count");
+  if(cnt)cnt.textContent=newsItems.length+" ITEMS";
+  buildTickerFromNews();
+}
+function buildTickerFromNews(){
+  const tk=$("#ticker-track");
+  if(!tk)return;
+  const seg=newsItems.slice(0,16)
+    .map(n=>` <em>[${fmtHM(n.t)}|${esc(n.src)}]</em> ${esc(n.text)}`)
+    .join(" <i>///</i> ");
+  tk.innerHTML=seg?seg+" <i>///</i> ":"LIVE RSS FEED CONNECTING...";
+}
+async function refreshNews(){
+  let okCnt=0;
+  await Promise.allSettled(FEEDS.map(async f=>{
+    const items=parseRssItems(await smartFetch(f.url));
+    pushRealNews(items,f.name);
+    okCnt++;
+    slog("RSS",`${f.name}: ${items.length} headlines ingested`);
+    setBadge("#feed-src",okCnt===FEEDS.length?"ok":"wait",`RSS ${okCnt}/${FEEDS.length}`);
+  }));
+  flags.news=okCnt>0;
+  if(okCnt===0)setBadge("#feed-src","err","RSS ERROR");
+  renderNews();
+  updateOverallStatus();
+}
+
+function renderTrendItems(items){
+  const ol=$("#trend-list");
+  if(!ol)return;
+  ol.innerHTML="";
+  items.slice(0,14).forEach(it=>{
+    const li=document.createElement("li");
+    li.innerHTML=`<span class="tr-rank"></span>
+      <span class="tr-main"><span class="tr-word">${esc(it.word)}</span>
+      ${it.sub?`<span class="tr-cat">${esc(it.sub)}</span>`:""}</span>
+      <span class="tr-vol">${esc(it.vol||"-")}</span>`;
+    ol.appendChild(li);
+  });
+}
+async function trendsGoogle(){
+  const xml=await smartFetch(CONFIG.googleTrendsUrl);
+  const doc=new DOMParser().parseFromString(xml,"text/xml");
+  if(doc.querySelector("parsererror"))throw new Error("xml");
+  const items=Array.from(doc.getElementsByTagName("item"));
+  if(!items.length)throw new Error("empty");
+  return items.map(it=>{
+    const title=(it.getElementsByTagName("title")[0]||{textContent:""}).textContent.trim();
+    const tn=it.getElementsByTagNameNS("*","approx_traffic")[0];
+    return{word:title,sub:"",vol:tn?tn.textContent.trim()+" searches":""};
+  }).filter(x=>x.word);
+}
+async function trendsTrends24(){
+  const html=await smartFetch(CONFIG.trends24Url);
+  const words=[...html.matchAll(/trend-link[^>]*>([^<]{1,80})</g)].map(m=>m[1].trim());
+  const counts=[...html.matchAll(/tweet-count[^>]*>\s*([0-9][0-9,.KMB]*)\s*tweets?\s*</gi)].map(m=>m[1]);
+  if(!words.length)throw new Error("no trends parsed");
+  return words.slice(0,14).map((w,i)=>({word:w,sub:"X(Twitter) JAPAN",vol:counts[i]?counts[i]+" posts":"-"}));
+}
+async function trendsMastodon(){
+  const j=await getJSON(CONFIG.mastodonTrendsUrl);
+  if(!Array.isArray(j)||!j.length)throw new Error("empty");
+  return j.map(t=>{
+    const h=(t.history&&t.history[0])||{};
+    const uses=Number(h.uses)||0;
+    return{word:"#"+(t.name||""),sub:"MASTODON SNS TRENDS",vol:uses.toLocaleString("ja-JP")+" posts"};
+  }).filter(x=>x.word.length>1);
+}
+const TREND_SOURCES=[
+  {name:"GOOGLE TRENDS LIVE",fn:trendsGoogle},
+  {name:"X JAPAN via TRENDS24",fn:trendsTrends24},
+  {name:"MASTODON SNS TRENDS",fn:trendsMastodon}
+];
+async function refreshTrends(){
+  for(const src of TREND_SOURCES){
+    try{
+      const items=await src.fn();
+      if(!items.length)continue;
+      renderTrendItems(items);
+      flags.trends=true;
+      setBadge("#trend-src","ok",src.name);
+      slog("TREND",`source locked: ${src.name} (${items.length} topics)`);
+      const ts=$("#trend-ts");
+      if(ts)ts.textContent="UPDATE "+fmtHM(new Date());
+      updateOverallStatus();
+      return;
+    }catch(e){}
+  }
+  flags.trends=false;
+  setBadge("#trend-src","err","ALL SOURCES ERROR");
+  slog("TREND","all trend sources failed");
+  updateOverallStatus();
+}
+
+const SCALE_MAP={"10":"1","20":"2","30":"3","40":"4","45":"5弱","50":"5強","55":"6弱","60":"6強","70":"7"};
+const quakeLog=[];
+const entryMap=new Map();
+const seenQuake=new Set();
+let quakeBooted=false;
+
+function magClass(m){return m!=null&&m>=5?"mag-hi":m!=null&&m>=3.5?"mag-md":"mag-lo";}
+function renderQuakes(){
+  const ul=$("#quake-log");
+  if(!ul)return;
+  ul.innerHTML=quakeLog.map(q=>{
+    const dom=q.domain==="jp"?`<span class="q-dom">国内</span>`:`<span class="q-intl">海外</span>`;
+    const magTxt=q.mag==null?"M--":`M${Number(q.mag).toFixed(1)}`;
+    const int=q.intensity?` 最大震度<b>${esc(q.intensity)}</b>`:"";
+    return `<li data-id="${esc(q.id)}"><span class="q-time">${fmtTime(q.t)}</span>${dom}
+      <span class="q-mag ${magClass(q.mag)}">${magTxt}</span>
+      <span class="q-place">${esc(q.place)}</span> 深さ約${q.depth??"--"}km${int}</li>`;
+  }).join("");
+  const stats=$("#q-stats");
+  if(stats){
+    const day=quakeLog.filter(q=>Date.now()-q.t<864e5).length;
+    stats.textContent=`24h: ${day}件`;
+  }
+}
+function addQuakeEntries(entries){
+  entries.forEach(e=>{
+    entryMap.set(e.id,e);
+    if(!seenQuake.has(e.id)){
+      seenQuake.add(e.id);
+      if(quakeBooted){
+        const big=e.scaleNum>=45||(e.mag!=null&&e.mag>=6);
+        if(big){
+          const dl=e.scaleNum>=55||(e.mag!=null&&e.mag>=7)?4
+                 :e.scaleNum>=50||(e.mag!=null&&e.mag>=6.5)?3:2;
+          pushDefconTrigger(dl,90,"QUAKE:"+e.id);
+          updateThreat();
+          showQAlert(e);
+          focusQuake(e);
+          sfxAlarm();
+          slog("ALERT",`quake ${e.place} M${e.mag==null?"--":e.mag.toFixed(1)}${e.intensity?" 震度"+e.intensity:""} → DEFCON pressure L${dl}`);
+        }else{
+          sfxPing();
+          slog("P2P",`new event: ${e.place} M${e.mag==null?"--":e.mag.toFixed(1)}`);
+        }
+      }
+    }
+  });
+  quakeBooted=true;
+  quakeLog.length=0;
+  quakeLog.push(...entries.sort((a,b)=>b.t-a.t).slice(0,CONFIG.maxQuakeLog));
+  renderQuakes();
+  updateThreat();
+}
+function parseP2pTime(s){
+  if(!s)return new Date();
+  const iso=new Date(s);
+  if(!isNaN(iso.getTime()))return iso;
+  const m=s.match(/(\d{4})\/(\d{2})\/(\d{2})\s+(\d{2}):(\d{2}):(\d{2})/);
+  if(m)return new Date(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+m[6]);
+  return new Date();
+}
+async function fetchP2p(){
+  const arr=await getJSON(CONFIG.p2pQuakeUrl);
+  if(!Array.isArray(arr))throw new Error("bad p2p payload");
+  return arr.map(e=>{
+    const eq=e.earthquake||{};
+    const hy=eq.hypocenter||{};
+    const sc=eq.maxScale;
+    const scaleNum=typeof sc==="number"&&sc>=10?sc:0;
+    return{
+      id:"p2p:"+e.time+":"+hy.name,
+      t:parseP2pTime(eq.occurrence_time||e.time),
+      mag:(typeof hy.magnitude==="number")?hy.magnitude:null,
+      place:hy.name||"不明な地点",
+      depth:(typeof hy.depth==="number")?hy.depth:null,
+      lat:(typeof hy.latitude==="number")?hy.latitude:null,
+      lon:(typeof hy.longitude==="number")?hy.longitude:null,
+      intensity:SCALE_MAP[String(sc)]||null,
+      scaleNum,
+      domain:"jp"
+    };
+  });
+}
+async function fetchUsgsQuakes(){
+  const j=await getJSON(CONFIG.usgsQuakeUrl);
+  const feats=(j&&j.features)||[];
+  return feats.map(f=>{
+    const c=f.geometry.coordinates;
+    return{
+      id:"usgs:"+f.id,
+      t:new Date(f.properties.time),
+      mag:f.properties.mag,
+      place:(f.properties.place||"Unknown region").split(",").pop().trim(),
+      depth:Math.max(1,Math.round(c?c[2]:0)),
+      lat:c?c[1]:null,
+      lon:c?c[0]:null,
+      intensity:null,
+      scaleNum:0,
+      domain:"intl"
+    };
+  });
+}
+async function refreshQuakes(){
+  const[r1,r2]=await Promise.allSettled([fetchP2p(),fetchUsgsQuakes()]);
+  const list=[];
+  if(r1.status==="fulfilled"){flags.p2p=true;list.push(...r1.value);slog("P2P",`synced ${r1.value.length} events (JMA pipeline)`);}
+  else{flags.p2p=false;slog("P2P","feed error: "+(r1.reason&&r1.reason.message||"unknown"));}
+  if(r2.status==="fulfilled"){flags.usgs=true;list.push(...r2.value);slog("USGS",`synced ${r2.value.length} events (global M4.5+)`);}
+  else{flags.usgs=false;slog("USGS","feed error: "+(r2.reason&&r2.reason.message||"unknown"));}
+  setBadge("#q-src",(flags.p2p||flags.usgs)?"ok":"err",
+    `${flags.p2p?"P2P":"P2Px"}·${flags.usgs?"USGS":"USGSx"}`);
+  if(list.length){
+    const uniq=new Map();
+    list.forEach(q=>{
+      const k=Math.round(q.t.getTime()/60000)+":"+q.place;
+      if(!uniq.has(k))uniq.set(k,q);
+    });
+    addQuakeEntries([...uniq.values()]);
+  }
+  updateOverallStatus();
+}
+
+let alertTimer=null;
+function showQAlert(q){
+  const el=$("#q-alert");
+  if(!el)return;
+  const magTxt=q.mag==null?"M--":"M"+Number(q.mag).toFixed(1);
+  const detail=q.domain==="jp"
+    ?`${q.place}　${magTxt}　最大震度${q.intensity}`
+    :`${q.place}　${magTxt}　深さ約${q.depth}km　（津波の有無を確認中）`;
+  el.innerHTML=`<b>▲ 緊急地震情報</b>　${esc(detail)}　— 周辺地域は揺れに警戒してください`;
+  el.classList.add("on");
+  clearTimeout(alertTimer);
+  alertTimer=setTimeout(()=>el.classList.remove("on"),15000);
+}
+
+let curLvl=0;
+const defconTriggers=[];
+function pushDefconTrigger(lvl,durMin,src){
+  for(let i=defconTriggers.length-1;i>=0;i--){
+    if(defconTriggers[i].src===src)defconTriggers.splice(i,1);
+  }
+  defconTriggers.push({lvl,src,until:Date.now()+durMin*60000});
+  if(defconTriggers.length>16)defconTriggers.shift();
+}
+function flashScreen(){
+  const f=$("#defcon-flash");
+  if(!f)return;
+  f.classList.remove("go");
+  void f.offsetWidth;
+  f.classList.add("go");
+}
+function updateThreat(){
+  const el=$("#threat-level");
+  if(!el)return;
+  const now=Date.now();
+  for(let i=defconTriggers.length-1;i>=0;i--){
+    if(defconTriggers[i].until<=now)defconTriggers.splice(i,1);
+  }
+  let lvl=1;
+  for(const t of defconTriggers)lvl=Math.max(lvl,t.lvl);
+  el.textContent="LEVEL "+lvl;
+  el.classList.toggle("crit",lvl>=4);
+  const col=lvl<=1?"var(--green)":lvl===2?"var(--cyan)":lvl===3?"var(--amber)":"var(--red)";
+  el.style.color=col;
+  el.style.borderColor=lvl<=2?"var(--line-hi)":col;
+  document.body.classList.toggle("dcw",lvl>=3);
+  document.body.classList.toggle("dcc",lvl>=4);
+  if(curLvl>0&&lvl>curLvl){
+    flashScreen();
+    sfxSiren();
+    const top=defconTriggers.filter(t=>t.lvl===lvl).map(t=>t.src.split(":")[0]).join(",");
+    slog("ALERT","DEFCON escalated → LEVEL "+lvl+" ["+top+"]");
+  }else if(curLvl>0&&lvl<curLvl){
+    slog("SYS","threat de-escalated → LEVEL "+lvl);
+  }
+  curLvl=lvl;
+}
+
+const GLOBE={cv:null,ctx:null,dpr:1,size:0,rotLon:138,rotLat:25,zoom:1,anim:null,focus:null,land:null,stars:[]};
+function sizeGlobe(){
+  const box=$("#globe-box"),cv=$("#globe-cv");
+  if(!box||!cv)return;
+  GLOBE.dpr=window.devicePixelRatio||1;
+  GLOBE.size=Math.round(clampN(box.clientWidth-18,280,560));
+  cv.width=GLOBE.size*GLOBE.dpr;
+  cv.height=GLOBE.size*GLOBE.dpr;
+  cv.style.width=GLOBE.size+"px";
+  cv.style.height=GLOBE.size+"px";
+  GLOBE.cv=cv;
+  GLOBE.ctx=cv.getContext("2d");
+}
+function initGlobe(){
+  sizeGlobe();
+  GLOBE.stars=Array.from({length:150},()=>({x:Math.random(),y:Math.random(),r:Math.random()*1.2+.3,a:Math.random()*.65+.15}));
+  requestAnimationFrame(globeLoop);
+}
+function project(lat,lon){
+  const g=GLOBE,R=g.size/2*g.zoom*.93;
+  const phi=lat*Math.PI/180,lam=lon*Math.PI/180;
+  const phi0=g.rotLat*Math.PI/180,lam0=g.rotLon*Math.PI/180;
+  const dl=lam-lam0;
+  const cosc=Math.sin(phi0)*Math.sin(phi)+Math.cos(phi0)*Math.cos(phi)*Math.cos(dl);
+  if(cosc<0)return null;
+  const x=R*Math.cos(phi)*Math.sin(dl);
+  const y=R*(Math.cos(phi0)*Math.sin(phi)-Math.sin(phi0)*Math.cos(phi)*Math.cos(dl));
+  return{x:g.size/2+x,y:g.size/2-y};
+}
+function norm180(v){return((v%360)+540)%360-180;}
+function focusQuake(q){
+  const g=GLOBE;
+  if(!g.ctx)return;
+  setGlobeInfo(q);
+  document.querySelectorAll("#quake-log li.sel").forEach(x=>x.classList.remove("sel"));
+  const li=document.querySelector('#quake-log li[data-id="'+CSS.escape(q.id)+'"]');
+  if(li){li.classList.add("sel");li.scrollIntoView({block:"nearest"});}
+  if(q.lat==null||q.lon==null)return;
+  let d=norm180(q.lon)-norm180(g.rotLon);
+  if(d>180)d-=360;
+  if(d<-180)d+=360;
+  g.anim={
+    t0:performance.now(),dur:1700,
+    fromLon:g.rotLon,fromLat:g.rotLat,fromZoom:g.zoom,
+    toLon:g.rotLon+d,toLat:clampN(q.lat,-58,58),toZoom:1.55,
+    end:q
+  };
+}
+function setGlobeInfo(q){
+  const el=$("#globe-info");
+  if(!el)return;
+  const magTxt=q.mag==null?"M--":"M"+Number(q.mag).toFixed(1);
+  el.innerHTML=`<b>▸ TARGET LOCK</b><br>${esc(q.place)}<br>${magTxt} / 深さ${q.depth??"--"}km / ${fmtTime(q.t)}`;
+}
+async function loadLand(){
+  try{
+    const j=await getJSON(CONFIG.landUrl);
+    const rings=[];
+    (j.features||[]).forEach(f=>{
+      const gm=f.geometry;
+      if(!gm)return;
+      const polys=gm.type==="Polygon"?[gm.coordinates]:gm.type==="MultiPolygon"?gm.coordinates:[];
+      polys.forEach(p=>{
+        if(p&&p[0]){
+          const pts=p[0].filter((_,i)=>i%4===0);
+          if(pts.length>3)rings.push(pts);
+        }
+      });
+    });
+    GLOBE.land=rings;
+    slog("SYS","coastline vectors loaded ("+rings.length+" rings)");
+  }catch(e){
+    slog("SYS","coastline data unavailable — graticule mode");
+  }
+}
+function drawGraticule(ctx){
+  ctx.strokeStyle="rgba(39,211,245,.09)";
+  ctx.lineWidth=.6;
+  for(let lon=-180;lon<180;lon+=30){
+    ctx.beginPath();
+    let pen=false;
+    for(let lat=-88;lat<=88;lat+=4){
+      const p=project(lat,lon);
+      if(p){pen?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y);pen=true;}
+      else pen=false;
+    }
+    ctx.stroke();
+  }
+  for(let lat=-60;lat<=60;lat+=30){
+    ctx.beginPath();
+    let pen=false;
+    for(let lon=-180;lon<=180;lon+=4){
+      const p=project(lat,lon);
+      if(p){pen?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y);pen=true;}
+      else pen=false;
+    }
+    ctx.stroke();
+  }
+}
+function drawLand(ctx){
+  if(!GLOBE.land)return;
+  ctx.strokeStyle="rgba(150,200,225,.34)";
+  ctx.lineWidth=.9;
+  GLOBE.land.forEach(ring=>{
+    ctx.beginPath();
+    let pen=false;
+    for(const pt of ring){
+      const p=project(pt[1],pt[0]);
+      if(p){pen?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y);pen=true;}
+      else pen=false;
+    }
+    ctx.stroke();
+  });
+}
+function drawQuakes(ctx,nowMs){
+  quakeLog.forEach(q=>{
+    if(q.lat==null||q.lon==null)return;
+    const p=project(q.lat,q.lon);
+    if(!p)return;
+    const ageH=(nowMs-q.t.getTime())/36e5;
+    const alpha=clampN(1.15-ageH*.16,.25,1);
+    const base=(2.2+(q.mag??3))*.95*GLOBE.zoom;
+    const col=q.mag!=null&&q.mag>=5?"255,77,106":q.mag!=null&&q.mag>=3.5?"255,180,84":"61,220,132";
+    ctx.fillStyle=`rgba(${col},${alpha})`;
+    ctx.beginPath();ctx.arc(p.x,p.y,base,0,7);ctx.fill();
+    if(ageH<1){
+      const pr=base*(1.6+.9*Math.sin(nowMs/220));
+      ctx.strokeStyle=`rgba(${col},${.5*alpha})`;
+      ctx.lineWidth=1;
+      ctx.beginPath();ctx.arc(p.x,p.y,pr,0,7);ctx.stroke();
+    }
+  });
+}
+function drawRipples(ctx,ts){
+  const f=GLOBE.focus;
+  if(!f||f.lat==null||f.lon==null)return;
+  const c=project(f.lat,f.lon);
+  if(!c)return;
+  const R=GLOBE.size/2*GLOBE.zoom*.93;
+  const el=(ts-f.start)/1000;
+  const rp=el*R*.62;
+  const rs=el*R*.34;
+  if(rp<R*1.95){
+    ctx.strokeStyle=`rgba(120,235,255,${clampN(1-rp/(R*1.95),0,.9)})`;
+    ctx.lineWidth=1.8;
+    ctx.beginPath();ctx.arc(c.x,c.y,rp,0,7);ctx.stroke();
+    ctx.strokeStyle=`rgba(120,235,255,${clampN(.6-rp/(R*1.95),0,.5)})`;
+    ctx.beginPath();ctx.arc(c.x,c.y,rp*.82,0,7);ctx.stroke();
+  }
+  if(rs<R*1.95){
+    ctx.strokeStyle=`rgba(255,77,106,${clampN(1-rs/(R*1.95),0,.9)})`;
+    ctx.lineWidth=1.6;
+    ctx.beginPath();ctx.arc(c.x,c.y,rs,0,7);ctx.stroke();
+    ctx.strokeStyle=`rgba(255,77,106,${clampN(.55-rs/(R*1.95),0,.45)})`;
+    ctx.beginPath();ctx.arc(c.x,c.y,rs*.86,0,7);ctx.stroke();
+  }
+  ctx.strokeStyle="rgba(255,255,255,.95)";
+  ctx.lineWidth=1.4;
+  ctx.beginPath();ctx.arc(c.x,c.y,5.5,0,7);ctx.stroke();
+  if(rp>R*1.95&&rs>R*1.95)GLOBE.focus=null;
+}
+function globeLoop(ts){
+  const g=GLOBE;
+  if(g.anim){
+    const p=easeIO(clampN((ts-g.anim.t0)/g.anim.dur,0,1));
+    g.rotLon=g.anim.fromLon+(g.anim.toLon-g.anim.fromLon)*p;
+    g.rotLat=g.anim.fromLat+(g.anim.toLat-g.anim.fromLat)*p;
+    g.zoom=g.anim.fromZoom+(g.anim.toZoom-g.anim.fromZoom)*p;
+    if(p>=1){
+      g.focus={...g.anim.end,start:ts};
+      g.anim=null;
+    }
+  }else if(!g.focus){
+    g.rotLon+=.028;
+    if(g.zoom>1.001)g.zoom=Math.max(1,g.zoom-.002);
+  }
+  const ctx=g.ctx;
+  if(ctx){
+    ctx.setTransform(g.dpr,0,0,g.dpr,0,0);
+    ctx.clearRect(0,0,g.size,g.size);
+    g.stars.forEach(s=>{
+      const a=s.a*(.55+.45*Math.sin(ts/700+s.x*40));
+      ctx.fillStyle=`rgba(199,217,228,${a})`;
+      ctx.fillRect(s.x*g.size,s.y*g.size,s.r,s.r);
+    });
+    const R=g.size/2*g.zoom*.93;
+    const grad=ctx.createRadialGradient(g.size/2-R*.3,g.size/2-R*.3,R*.1,g.size/2,g.size/2,R);
+    grad.addColorStop(0,"#102230");
+    grad.addColorStop(1,"#040a11");
+    ctx.fillStyle=grad;
+    ctx.beginPath();ctx.arc(g.size/2,g.size/2,R,0,7);ctx.fill();
+    ctx.strokeStyle="rgba(39,211,245,.4)";
+    ctx.lineWidth=1.2;
+    ctx.shadowColor="rgba(39,211,245,.65)";ctx.shadowBlur=14;
+    ctx.beginPath();ctx.arc(g.size/2,g.size/2,R,0,7);ctx.stroke();
+    ctx.shadowBlur=0;
+    ctx.save();
+    ctx.beginPath();ctx.arc(g.size/2,g.size/2,R,0,7);ctx.clip();
+    drawGraticule(ctx);
+    drawLand(ctx);
+    drawQuakes(ctx,Date.now());
+    drawRipples(ctx,ts);
+    ctx.restore();
+  }
+  requestAnimationFrame(globeLoop);
+}
+
+function clockLoop(){
+  const now=new Date();
+  const j=$("#clock-jst"),u=$("#clock-utc");
+  if(j)j.textContent=now.toLocaleTimeString("ja-JP",{timeZone:"Asia/Tokyo",hour12:false});
+  if(u)u.textContent=now.toLocaleTimeString("en-GB",{timeZone:"UTC",hour12:false});
+  updateWClock();
+}
+
+function init(){
+  try{
+    document.querySelectorAll("#news-tabs .tab").forEach(t=>{
+      t.addEventListener("click",()=>{
+        document.querySelectorAll("#news-tabs .tab").forEach(x=>x.classList.remove("act"));
+        t.classList.add("act");
+        newsFilter=t.dataset.f;
+        renderNews();
+      });
+    });
+
+    $("#news-list").innerHTML='<li><span class="n-txt">RSSフィードに接続中...</span></li>';
+    $("#trend-list").innerHTML='<li><span class="tr-word">トレンドソースに接続中...</span></li>';
+    $("#quake-log").innerHTML='<li><span class="q-time">P2P地震情報 / USGS に接続中...</span></li>';
+
+    buildWClock();
+    buildMarketCards();
+    initGlobe();
+    loadLand();
+
+    const qlog=$("#quake-log");
+    if(qlog){
+      qlog.addEventListener("click",e=>{
+        const li=e.target.closest("li[data-id]");
+        if(!li)return;
+        const q=entryMap.get(li.dataset.id);
+        if(q)focusQuake(q);
+      });
+    }
+
+    const sc=$("#syscon"),sch=$("#syscon-head");
+    if(sc&&sch){
+      let saved=null;
+      try{saved=localStorage.getItem("nw_syscon");}catch(e){}
+      if(saved==="1"){
+        sc.classList.add("closed");
+        const ch=$("#syscon-chev");
+        if(ch)ch.textContent="▸";
+      }
+      sch.addEventListener("click",()=>{
+        sc.classList.toggle("closed");
+        const closed=sc.classList.contains("closed");
+        const ch=$("#syscon-chev");
+        if(ch)ch.textContent=closed?"▸":"▾";
+        try{localStorage.setItem("nw_syscon",closed?"1":"0");}catch(e){}
+        slog("SYS","console "+(closed?"collapsed":"expanded"));
+      });
+    }
+
+    window.addEventListener("resize",()=>{
+      sizeGlobe();
+      MARKETS.forEach(m=>{
+        if(!m.cv)return;
+        const dpr=window.devicePixelRatio||1;
+        m.cv.width=Math.max(m.cv.clientWidth*dpr,1);
+        m.cv.height=Math.max(m.cv.clientHeight*dpr,1);
+        drawSpark(m);
+      });
+      renderTradeMap();
+    });
+
+    clockLoop();setInterval(clockLoop,1000);
+
+    slog("SYS","NEXUS//WATCH v3.0-FINAL online");
+    slog("SYS","feeds armed: P2P_QUAKE / USGS / YAHOO→STOOQ→FX-APIs / BINANCE→COINBASE→COINGECKO / RSS x4 / TRENDS x3");
+    slog("SYS","DEFCON logic: event-driven — LEVEL 1 in calm, escalates only on major quake or market shock");
+    slog("SYS","globe renderer engaged — ortho projection, seismic overlay");
+
+    refreshMarkets();setInterval(refreshMarkets,CONFIG.marketRefreshMs);
+    refreshQuakes();setInterval(refreshQuakes,CONFIG.quakeRefreshMs);
+    refreshNews();setInterval(refreshNews,CONFIG.newsRefreshMs);
+    refreshTrends();setInterval(refreshTrends,CONFIG.trendRefreshMs);
+    setInterval(updateThreat,60000);
+  }catch(e){
+    document.querySelectorAll(".panel").forEach(p=>p.style.opacity="1");
+  }
+}
+
+if(document.readyState==="loading"){
+  document.addEventListener("DOMContentLoaded",init,{once:true});
+}else{
+  init();
+}
+</script>
+</body>
+</html>
